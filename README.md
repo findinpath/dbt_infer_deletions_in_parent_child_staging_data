@@ -85,7 +85,7 @@ and
 }
 ```
 
-Between `2021-02-15 10:00:00` and `2021-02-15 11:00:00` the user `johndoe` made a new subscription to the channel
+Between `2021-02-15 09:00:00` and `2021-02-15 10:00:00` the user `johndoe` made a new subscription to the channel
 `DevTips` and unsubscribed from the channel `5-Minute Crafts`.
 
 This proof of concept project offers a solution on how to infer deletions of child entities within complex objects 
