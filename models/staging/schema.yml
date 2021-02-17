@@ -1,0 +1,60 @@
+version: 2
+
+sources:
+  - name: dbt_video_platform
+    tables:
+      - name: raw_user_subscription
+        description: >
+          This table contains the source user subcription entries to be staged into the data warehouse.
+          The user subscriptions are synced near real-time  after a change on the subscriptions for
+          a user occurs (new subscription is being added / existing subscription is being deleted)
+          This is why all the products from a batch share the same `export_time`
+          NOTE that in case that a product gets deactivated in the source system it will simply not
+          appear in the next exported batch of products.
+        columns:
+          - name: export_time
+            description: Timestamp when the export from source system was triggered.
+            tests:
+              - not_null
+          - name: record
+            description: JSON content that corresponds to a user subcriptions record.
+            tests:
+              - not_null
+
+models:
+
+  - name: stg_user_subscription
+    description: >
+        Staging table for the products from the dbt shop that corresponds to the
+        `raw_products` table to which it adds artificially deletion entries in case
+        that a product is deactivated from an exported day to the next one.
+    columns:
+      - name: load_id
+        description: >
+            The id for the staging user subscription entry
+        tests:
+          - not_null
+      - name: exported_at
+        description: Timestamp when the user information (along the subscriptions) has been exported from the source system.
+        tests:
+          - not_null
+      - name: user_id
+        description: User identifier in the source system.
+        tests:
+          - not_null
+      - name: subscription_id
+        description: Subscription identifier in the source system
+        tests:
+          - not_null
+      - name: subscription_index
+        description: Index of the subscriptions within the user's subscriptions (starts at 0)
+      - name: subscription_name
+        description: Name of the channel to which the user subscribed to.
+      - name: subscription_subscribed_at
+        description: Timestamp when the user subscribed to the channel.
+      - name: subscriptions_size
+        description: Number of the subscriptions for the user for the record corresponding to `load_id`
+      - name: _deleted
+        description: >
+          This field acts as a flag for deleted entries from the source system.
+          It can have the value TRUE when the product got deleted, or NULL otherwise (when it was upserted).

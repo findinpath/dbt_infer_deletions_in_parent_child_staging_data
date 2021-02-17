@@ -1,0 +1,150 @@
+---
+version: '0.1'
+
+identifiers:
+  - identifier: id_generator
+    attributes:
+      - field: id
+        generator: unique_integer
+
+# All the raw sources used in dbt_video_platform
+sources:
+
+  - source: raw_user_subscription
+    identifier_map:
+      - column: id
+        identifier:
+          name: id_generator
+          attribute: id
+
+
+
+targets:
+
+  - target: stg_user_subscription
+    identifier_map:
+      - column: load_id
+        identifier:
+          name: id_generator
+          attribute: id
+
+# Typically, we have a separate scenario for each target table, however your
+# project's needs may differ.
+scenarios:
+  - scenario: Building stg_user_subscription out of the raw_user_subscription
+
+    cases:
+      - case: >
+          Demo loading of the historized staging table `stg_user_subscription`
+
+          Tested scenarios:
+          - staging entry with id `id1` belonging to the user `johndoe` : contains the subscription entries "5-Minute Crafts", "euronews", "Treehouse"
+          - staging entry with id `id2` belonging to the user `johndoe` : contains the subscription entries "euronews", "Treehouse", "DevTips"
+
+          The subscription entry "5-Minute Crafts" should be marked as deleted because it doesn't appear anymore in the `id2` record.
+
+        factory:
+          data:
+            - source: raw_user_subscription
+              table: |
+                | id               | record                                                                                                                                                                                                                                                                                             |
+                | -                | -                                                                                                                                                                                                                                                                                                  |
+                | id1              | {"id":1,"username":"johndoe","created_at":1609455600000,"exported_at":1613379600000,"subscriptions":[{"id":1000,"name":"5-Minute Crafts","subscribed_at":1612170000000},{"id":2000,"name":"euronews","subscribed_at":1612256400000},{"id":3000,"name":"Treehouse","subscribed_at":1612342800000}]} |
+                | id2              | {"id":1,"username":"johndoe","created_at":1609455600000,"exported_at":1613383200000,"subscriptions":[{"id":2000,"name":"euronews","subscribed_at":1612256400000},{"id":3000,"name":"Treehouse","subscribed_at":1612342800000},{"id":4000,"name":"DevTips","subscribed_at":1613381400000}]}         |
+        expected:
+          data:
+            - target: stg_user_subscription
+              table: |
+                | load_id      | exported_at             | user_id           | subscription_id      | subscription_index  | subscription_name        | subscription_subscribed_at | subscriptions_size  | _deleted   |
+                | -            | -                       | -                 | -                    | -                   | -                        | -                          | -                   | -          |
+                | id1          | 2021-02-15 09:00:00     | 1                 | 1000                 | 0                   | 5-Minute Crafts          | 2021-02-01 09:00:00        | 3                   | False      |
+                | id1          | 2021-02-15 09:00:00     | 1                 | 2000                 | 1                   | euronews                 | 2021-02-02 09:00:00        | 3                   | False      |
+                | id1          | 2021-02-15 09:00:00     | 1                 | 3000                 | 2                   | Treehouse                | 2021-02-03 09:00:00        | 3                   | False      |
+                | id2          | 2021-02-15 10:00:00     | 1                 | 1000                 | {NULL}              | {NULL}                   | {NULL}                     | {NULL}              | True       |
+                | id2          | 2021-02-15 10:00:00     | 1                 | 2000                 | 0                   | euronews                 | 2021-02-02 09:00:00        | 3                   | False      |
+                | id2          | 2021-02-15 10:00:00     | 1                 | 3000                 | 1                   | Treehouse                | 2021-02-03 09:00:00        | 3                   | False      |
+                | id2          | 2021-02-15 10:00:00     | 1                 | 4000                 | 2                   | DevTips                  | 2021-02-15 09:30:00        | 3                   | False      |
+
+              by:
+                - load_id
+                - user_id
+                - subscription_id
+
+      - case: >
+          Accuracy test to verify that if the last entry staged contains no subscriptions, deletion entries for the previous subscriptions
+          of the user should be created in `stg_user_subscription`
+
+          Tested scenarios:
+          - staging entry with id `id1` belonging to the user `janedoe` : contains the subscription entries "5-Minute Crafts", "euronews", "Treehouse"
+          - staging entry with id `id2` belonging to the user `janedoe` : contains no subscription entries
+
+          The subscription entries "5-Minute Crafts", "euronews", "Treehouse" should be marked as deleted because they
+          do not appear anymore in the `id2` record.
+
+        factory:
+          data:
+            - source: raw_user_subscription
+              table: |
+                | id               | record                                                                                                                                                                                                                                                                                             |
+                | -                | -                                                                                                                                                                                                                                                                                                  |
+                | id1              | {"id":2,"username":"janedoe","created_at":1609455600000,"exported_at":1613379600000,"subscriptions":[{"id":1000,"name":"5-Minute Crafts","subscribed_at":1612170000000},{"id":2000,"name":"euronews","subscribed_at":1612256400000},{"id":3000,"name":"Treehouse","subscribed_at":1612342800000}]} |
+                | id2              | {"id":2,"username":"janedoe","created_at":1609455600000,"exported_at":1613383200000,"subscriptions":[]}                                                                                                                                                                                            |
+        expected:
+          data:
+            - target: stg_user_subscription
+              table: |
+                | load_id      | exported_at             | user_id           | subscription_id      | subscription_index  | subscription_name        | subscription_subscribed_at | subscriptions_size  | _deleted   |
+                | -            | -                       | -                 | -                    | -                   | -                        | -                          | -                   | -          |
+                | id1          | 2021-02-15 09:00:00     | 2                 | 1000                 | 0                   | 5-Minute Crafts          | 2021-02-01 09:00:00        | 3                   | False      |
+                | id1          | 2021-02-15 09:00:00     | 2                 | 2000                 | 1                   | euronews                 | 2021-02-02 09:00:00        | 3                   | False      |
+                | id1          | 2021-02-15 09:00:00     | 2                 | 3000                 | 2                   | Treehouse                | 2021-02-03 09:00:00        | 3                   | False      |
+                | id2          | 2021-02-15 10:00:00     | 2                 | 1000                 | {NULL}              | {NULL}                   | {NULL}                     | {NULL}              | True       |
+                | id2          | 2021-02-15 10:00:00     | 2                 | 2000                 | {NULL}              | {NULL}                   | {NULL}                     | {NULL}              | True       |
+                | id2          | 2021-02-15 10:00:00     | 2                 | 3000                 | {NULL}              | {NULL}                   | {NULL}                     | {NULL}              | True       |
+
+              by:
+                - load_id
+                - user_id
+                - subscription_id
+
+      - case: >
+          Accuracy test to verify that if the last entry staged contains no subscriptions, deletion entries for the previous subscriptions
+          of the user should be created in `stg_user_subscription`
+
+          Tested scenarios:
+          - staging entry with id `id1` belonging to the user `ringo` : contains the subscription entries "5-Minute Crafts", "euronews", "Treehouse"
+          - staging entry with id `id2` belonging to the user `ringo` : contains no subscription entries
+          - staging entry with id `id3` belonging to the user `ringo` : contains the subscription entry   "DevTips"
+
+          The subscription entries "5-Minute Crafts", "euronews", "Treehouse" should be marked as deleted because they
+          do not appear anymore in the `id2` record.
+          The subscription entry "euronews" and "DevTips" from the entry with id `id3` are considered new and should land in the staging table as inserted (`_deleted` : NULL).
+
+        factory:
+          data:
+            - source: raw_user_subscription
+              table: |
+                | id               | record                                                                                                                                                                                                                                                                                             |
+                | -                | -                                                                                                                                                                                                                                                                                                  |
+                | id1              | {"id":3,"username":"ringo","created_at":1609455600000,"exported_at":1613379600000,"subscriptions":[{"id":1000,"name":"5-Minute Crafts","subscribed_at":1612170000000},{"id":2000,"name":"euronews","subscribed_at":1612256400000},{"id":3000,"name":"Treehouse","subscribed_at":1612342800000}]} |
+                | id2              | {"id":3,"username":"ringo","created_at":1609455600000,"exported_at":1613383200000,"subscriptions":[]}                                                                                                                                                                                            |
+                | id3              | {"id":3,"username":"ringo","created_at":1609455600000,"exported_at":1613386800000,"subscriptions":[{"id":2000,"name":"euronews","subscribed_at":1613385900000},{"id":4000,"name":"DevTips","subscribed_at":1613385900000}]}                                                                                                                                                                                            |
+        expected:
+          data:
+            - target: stg_user_subscription
+              table: |
+                | load_id      | exported_at             | user_id           | subscription_id      | subscription_index  | subscription_name        | subscription_subscribed_at | subscriptions_size  | _deleted   |
+                | -            | -                       | -                 | -                    | -                   | -                        | -                          | -                   | -          |
+                | id1          | 2021-02-15 09:00:00     | 3                 | 1000                 | 0                   | 5-Minute Crafts          | 2021-02-01 09:00:00        | 3                   | False      |
+                | id1          | 2021-02-15 09:00:00     | 3                 | 2000                 | 1                   | euronews                 | 2021-02-02 09:00:00        | 3                   | False      |
+                | id1          | 2021-02-15 09:00:00     | 3                 | 3000                 | 2                   | Treehouse                | 2021-02-03 09:00:00        | 3                   | False      |
+                | id2          | 2021-02-15 10:00:00     | 3                 | 1000                 | {NULL}              | {NULL}                   | {NULL}                     | {NULL}              | True       |
+                | id2          | 2021-02-15 10:00:00     | 3                 | 2000                 | {NULL}              | {NULL}                   | {NULL}                     | {NULL}              | True       |
+                | id2          | 2021-02-15 10:00:00     | 3                 | 3000                 | {NULL}              | {NULL}                   | {NULL}                     | {NULL}              | True       |
+                | id3          | 2021-02-15 11:00:00     | 3                 | 2000                 | 0                   | euronews                 | 2021-02-15 10:45:00        | 2                   | False      |
+                | id3          | 2021-02-15 11:00:00     | 3                 | 4000                 | 1                   | DevTips                  | 2021-02-15 10:45:00        | 2                   | False      |
+
+              by:
+                - load_id
+                - user_id
+                - subscription_id

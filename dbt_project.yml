@@ -1,0 +1,27 @@
+name: 'dbt_video_platform'
+version: '1.0'
+config-version: 2
+require-dbt-version: ">=0.19.0"
+
+profile: 'dbt_video_platform'
+
+source-paths: ["models", "sources"]
+test-paths: ["tests"]
+data-paths: ["data"]
+
+# directory which will store compiled SQL files
+target-path: "target"
+
+# directories to be removed by `dbt clean`
+clean-targets:
+  - "target"
+  - "dbt_modules"
+  - "logs"
+
+models:
+  dbt_video_platform:
+      materialized: table
+      staging:
+        materialized: table
+        transient: true
+        tags: ["staging"]
