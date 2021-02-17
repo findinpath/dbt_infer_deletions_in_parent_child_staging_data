@@ -227,10 +227,9 @@ and subsequently to create the `dbt` model showcased in this project:
 ```
 
 ```sql
-
 select *
 from playground.dbt_video_platform.stg_user_subscription
-order by user_id, subscription_id, exported_at, subscribed_at;
+order by load_id, subscription_id;
 ```
 
 ```
