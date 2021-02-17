@@ -220,6 +220,8 @@ select *
 from playground.dbt_video_platform.raw_user_subscription;
 ```
 
+![raw user subscriptions](docs/raw-user-subscriptions.png)
+
 and subsequently to create the `dbt` model showcased in this project:
 
 ```bash
@@ -232,7 +234,8 @@ from playground.dbt_video_platform.stg_user_subscription
 order by load_id, subscription_id;
 ```
 
-```
+![staged user subscriptions with inferred deletions](docs/staged-user-subscriptions.png)
+
 
 Deactivate the Python virtual environment
 
